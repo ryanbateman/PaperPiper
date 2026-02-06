@@ -4,7 +4,7 @@ import sys
 import os
 
 def main():
-    parser = argparse.ArgumentParser(description="M5Stack PaperS3 Remote Display Client")
+    parser = argparse.ArgumentParser(description="Paper Piper - M5Stack PaperS3 Remote Display Client")
     subparsers = parser.add_subparsers(dest="command", required=True)
     
     # Text command
@@ -12,11 +12,13 @@ def main():
     text_parser.add_argument("payload", nargs="?", help="Text to display")
     text_parser.add_argument("--size", type=int, default=3, help="Text size (default: 3)")
     text_parser.add_argument("--ip", help="IP address (overrides PAPER_IP env var)")
+    text_parser.add_argument("--retain", action="store_true", help="Keep content on screen when device sleeps")
     
     # Image command
     img_parser = subparsers.add_parser("image", help="Send image")
     img_parser.add_argument("payload", nargs="?", help="Image file path (optional, reads from stdin if omitted)")
     img_parser.add_argument("--ip", help="IP address (overrides PAPER_IP env var)")
+    img_parser.add_argument("--retain", action="store_true", help="Keep content on screen when device sleeps")
     
     # Stream command (Raw TCP)
     stream_parser = subparsers.add_parser("stream", help="Stream text line-by-line (tail -f)")
@@ -30,6 +32,7 @@ def main():
     map_parser.add_argument("--zoom", type=int, help="Zoom level (0-18, default based on location type)")
     map_parser.add_argument("--ip", help="IP address (overrides PAPER_IP env var)")
     map_parser.add_argument("--api-key", help="Stadia Maps API key (or set STADIA_API_KEY env var)")
+    map_parser.add_argument("--retain", action="store_true", help="Keep content on screen when device sleeps")
     
     # MQTT command
     mqtt_parser = subparsers.add_parser("mqtt", help="Subscribe to MQTT topic and display messages")
@@ -39,6 +42,12 @@ def main():
     mqtt_parser.add_argument("--username", help="MQTT username (optional)")
     mqtt_parser.add_argument("--password", help="MQTT password (optional)")
     mqtt_parser.add_argument("--ip", help="IP address (overrides PAPER_IP env var)")
+    
+    # Retain command (standalone)
+    retain_parser = subparsers.add_parser("retain", help="Toggle or set retain mode")
+    retain_parser.add_argument("--on", action="store_true", help="Enable retain mode")
+    retain_parser.add_argument("--off", action="store_true", help="Disable retain mode")
+    retain_parser.add_argument("--ip", help="IP address (overrides PAPER_IP env var)")
 
     args = parser.parse_args()
     
@@ -49,6 +58,16 @@ def main():
         sys.exit(1)
     
     base_url = f"http://{ip}/api"
+    
+    def set_retain(enabled):
+        """Set retain mode on device"""
+        try:
+            resp = requests.post(f"{base_url}/retain", json={"retain": enabled}, timeout=5)
+            resp.raise_for_status()
+            if enabled:
+                print("Retain mode enabled - content will persist when device sleeps")
+        except Exception as e:
+            print(f"Warning: Could not set retain mode: {e}", file=sys.stderr)
     
     if args.command == "text":
         content = args.payload
@@ -71,6 +90,8 @@ def main():
             resp = requests.post(f"{base_url}/text", json=data, timeout=5)
             resp.raise_for_status()
             print("Success!")
+            if args.retain:
+                set_retain(True)
         except Exception as e:
             print(f"Error: {e}")
 
@@ -156,6 +177,8 @@ def main():
             resp = requests.post(f"{base_url}/image", files=files, timeout=30)
             resp.raise_for_status()
             print("Success!")
+            if args.retain:
+                set_retain(True)
         except Exception as e:
             print(f"Error: {e}")
 
@@ -210,7 +233,7 @@ def main():
                     "limit": 1
                 }
                 geocode_headers = {
-                    "User-Agent": "PaperS3-Streamer/1.0"
+                    "User-Agent": "PaperPiper/1.0"
                 }
                 geocode_resp = requests.get(geocode_url, params=geocode_params, headers=geocode_headers, timeout=10)
                 geocode_resp.raise_for_status()
@@ -342,6 +365,8 @@ def main():
             resp = requests.post(f"{base_url}/image", files=files, timeout=30)
             resp.raise_for_status()
             print("Success! Map displayed.")
+            if args.retain:
+                set_retain(True)
             
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 401:
@@ -391,6 +416,29 @@ def main():
             except:
                 pass
             sys.exit(1)
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    # Retain Mode (standalone)
+    elif args.command == "retain":
+        try:
+            if args.on:
+                data = {"retain": True}
+            elif args.off:
+                data = {"retain": False}
+            else:
+                data = {}  # Toggle
+            
+            resp = requests.post(f"{base_url}/retain", json=data, timeout=5)
+            resp.raise_for_status()
+            result = resp.json()
+            
+            status = "enabled" if result.get("retain") else "disabled"
+            print(f"Retain mode {status}")
+            if result.get("retain"):
+                print("Content will persist on screen when device sleeps")
+            
         except Exception as e:
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)

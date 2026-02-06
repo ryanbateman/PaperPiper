@@ -1,4 +1,4 @@
-# PaperS3 Streamer
+# Paper Piper
 
 A wireless E-Ink display system for the [M5Stack PaperS3](https://shop.m5stack.com/products/m5paper-s3). Turn your PaperS3 into a remote display that can show text, images, maps, live streams, and MQTT messages.
 
@@ -7,6 +7,7 @@ A wireless E-Ink display system for the [M5Stack PaperS3](https://shop.m5stack.c
 - **Five Display Modes**: Text, Image, Stream, Map, and MQTT
 - **Auto-Rotation**: Integrated IMU rotates content when you rotate the device
 - **Auto-Shutdown**: Powers off after 3 minutes of inactivity to save battery
+- **Retain Mode**: Keep content visible on screen even when the device sleeps
 - **Touch Gestures**: Swipe to navigate pages, change font size, or toggle UI
 - **REST API**: Simple HTTP endpoints for easy integration
 
@@ -241,15 +242,46 @@ mosquitto_pub -h test.mosquitto.org -t "test/paper" -m "Hello from MQTT!"
 
 ---
 
+### Retain Mode
+
+Keep content visible on the e-ink display even when the device goes to sleep. When retain mode is enabled, the device will show a "Sleeping..." indicator at the bottom while preserving your content. On wake, the screen clears and shows the welcome screen.
+
+**Using the Python client:**
+```bash
+# Send content with retain flag
+python client/paper_cli.py text "This will stay visible" --retain
+python client/paper_cli.py image photo.jpg --retain
+python client/paper_cli.py map --location "Paris" --retain
+
+# Toggle retain mode separately
+python client/paper_cli.py retain --on
+python client/paper_cli.py retain --off
+python client/paper_cli.py retain  # toggles current state
+```
+
+**Using curl:**
+```bash
+# Enable retain mode
+curl -X POST http://192.168.1.100/api/retain \
+  -H "Content-Type: application/json" \
+  -d '{"retain": true}'
+
+# Toggle retain mode
+curl -X POST http://192.168.1.100/api/retain
+```
+
+---
+
 ## API Reference
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/status` | GET | Device status (mode, memory, screen size, rotation) |
+| `/api/status` | GET | Device status (mode, memory, screen size, rotation, retain) |
 | `/api/screenshot` | GET | Current display as BMP image |
 | `/api/text` | POST | Display text content |
 | `/api/image` | POST | Display image (multipart upload) |
 | `/api/mqtt` | POST | Configure MQTT subscription |
+| `/api/retain` | POST | Set or toggle retain mode |
 | Port `2323` | TCP | Raw stream connection |
 
 ### Status Response Example
@@ -260,7 +292,8 @@ mosquitto_pub -h test.mosquitto.org -t "test/paper" -m "Hello from MQTT!"
   "screen_width": 960,
   "screen_height": 540,
   "rotation": 1,
-  "wifi_rssi": -62
+  "wifi_rssi": -62,
+  "retain": false
 }
 ```
 

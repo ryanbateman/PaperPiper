@@ -58,6 +58,7 @@ M5Canvas canvas(&M5.Display); // Global Sprite
 // Power Management
 const uint32_t TIMEOUT_MS = 180000; // 3 Minutes
 uint32_t lastActivityTime = 0;
+bool retainOnSleep = false; // When true, keep content on screen when sleeping
 
 void resetActivity() {
     lastActivityTime = millis();
@@ -82,6 +83,8 @@ void handleMqtt();
 void handleMqttLoop();
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void mqttReconnect();
+void handleRetain();
+void drawSleepOverlay();
 
 void setup() {
     auto cfg = M5.config();
@@ -105,6 +108,7 @@ void setup() {
     server.on("/api/screenshot", HTTP_GET, handleScreenshot);
     server.on("/api/text", HTTP_POST, handleText);
     server.on("/api/mqtt", HTTP_POST, handleMqtt);
+    server.on("/api/retain", HTTP_POST, handleRetain);
     server.on("/api/image", HTTP_POST, 
         []() { server.send(200, "application/json", "{\"status\":\"ok\"}"); },
         handleImageUpload
@@ -125,8 +129,15 @@ void loop() {
     
     // Timeout Check
     if (millis() - lastActivityTime > TIMEOUT_MS) {
-        drawWelcome(true); // Show "Sleeping..."
-        delay(2000);       // Give it time to render
+        if (retainOnSleep && currentMode != MODE_NONE) {
+            // Keep content, just add sleep overlay at bottom
+            drawSleepOverlay();
+            delay(2000);
+        } else {
+            drawWelcome(true); // Show "Sleeping..."
+            delay(2000);       // Give it time to render
+        }
+        retainOnSleep = false; // Reset for next wake
         M5.Power.powerOff();
     }
     
@@ -147,7 +158,7 @@ void calculatePages() {
     int screenW = M5.Display.width();
     int screenH = M5.Display.height();
     if (uiVisible) {
-        screenH -= (HEADER_HEIGHT + FOOTER_HEIGHT);
+        screenH -= (HEADER_HEIGHT + FOOTER_HEIGHT + MARGIN);  // Account for extra padding below header
     }
     int lineHeight = M5.Display.fontHeight() * 1.2; 
     int maxLines = (screenH - (MARGIN * 2)) / lineHeight;
@@ -253,7 +264,7 @@ void drawWelcome(bool sleeping) {
     
     // Title - large
     M5.Display.setTextSize(3);
-    M5.Display.drawString("PaperS3 Streamer", w/2, y);
+    M5.Display.drawString("Paper Piper", w/2, y);
     y += 50;
     
     // IP Address - very large
@@ -444,6 +455,85 @@ void handleMqtt() {
     }
 }
 
+// =================================================================================
+// Retain Mode Functions
+// =================================================================================
+
+void handleRetain() {
+    resetActivity();
+    
+    String body = "";
+    if (server.hasArg("plain")) {
+        body = server.arg("plain");
+    }
+    
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, body);
+    
+    if (!error && doc["retain"].is<bool>()) {
+        retainOnSleep = doc["retain"].as<bool>();
+    } else {
+        // Toggle if no body or invalid JSON
+        retainOnSleep = !retainOnSleep;
+    }
+    
+    JsonDocument resp;
+    resp["status"] = "ok";
+    resp["retain"] = retainOnSleep;
+    
+    String response;
+    serializeJson(resp, response);
+    server.send(200, "application/json", response);
+}
+
+void drawSleepOverlay() {
+    // Redraw content without UI elements, with proper padding
+    M5.Display.setEpdMode(epd_mode_t::epd_quality);
+    
+    int w = M5.Display.width();
+    int h = M5.Display.height();
+    int sleepPadding = 20;  // Nice padding from top edge
+    
+    // Clear screen and redraw content without header/footer
+    M5.Display.fillScreen(TFT_WHITE);
+    
+    // Redraw content based on mode
+    if (currentMode == MODE_TEXT || currentMode == MODE_MQTT) {
+        if (!pages.empty() && currentPage < pages.size()) {
+            M5.Display.setTextColor(TFT_BLACK);
+            M5.Display.setTextSize(currentTextSize);
+            M5.Display.setCursor(MARGIN, sleepPadding);
+            M5.Display.print(pages[currentPage]);
+        }
+    } else if (currentMode == MODE_IMAGE) {
+        // Redraw image without header
+        int imgW = 0, imgH = 0;
+        bool valid = getJpegSize(imgBuffer, imgReceivedLen, &imgW, &imgH);
+        if (valid && canvas.width() == imgW && canvas.height() == imgH) {
+            int scrW = M5.Display.width();
+            int scrH = M5.Display.height();
+            float scaleX = (float)scrW / imgW;
+            float scaleY = (float)scrH / imgH;
+            float scale = (scaleX < scaleY) ? scaleX : scaleY;
+            canvas.pushRotateZoom(&M5.Display, scrW / 2, scrH / 2, 0, scale, scale);
+        }
+    }
+    
+    // Draw sleep overlay at bottom
+    int overlayHeight = 50;
+    int overlayY = h - overlayHeight;
+    
+    M5.Display.fillRect(0, overlayY, w, overlayHeight, TFT_WHITE);
+    M5.Display.drawLine(0, overlayY, w, overlayY, TFT_BLACK);
+    
+    // Draw "Sleeping..." centered in overlay
+    M5.Display.setTextSize(2);
+    M5.Display.setTextColor(TFT_BLACK);
+    M5.Display.setTextDatum(middle_center);
+    M5.Display.drawString("Sleeping...", w / 2, overlayY + (overlayHeight / 2));
+    
+    M5.Display.startWrite(); M5.Display.endWrite();
+}
 
 void drawLayout() {
     // Reset to Quality mode for standard views (Text/Image) to ensure correct rendering
@@ -459,7 +549,7 @@ void drawLayout() {
             M5.Display.setTextColor(TFT_BLACK);
             M5.Display.setTextSize(currentTextSize);
             int yStart = MARGIN;
-            if (uiVisible) yStart += HEADER_HEIGHT;
+            if (uiVisible) yStart += HEADER_HEIGHT + MARGIN;  // Extra padding below header
             M5.Display.setCursor(MARGIN, yStart);
             M5.Display.print(pages[currentPage]);
         }
@@ -795,6 +885,7 @@ void handleStatus() {
     doc["screen_width"] = M5.Display.width();
     doc["screen_height"] = M5.Display.height();
     doc["rotation"] = currentRotation;
+    doc["retain"] = retainOnSleep;
     
     // MQTT Status
     if (currentMode == MODE_MQTT) {
