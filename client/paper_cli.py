@@ -23,10 +23,11 @@ def main():
     stream_parser.add_argument("--ip", help="IP address (overrides PAPER_IP env var)")
     
     # Map command
-    map_parser = subparsers.add_parser("map", help="Display a map at given coordinates")
-    map_parser.add_argument("--lat", type=float, required=True, help="Latitude")
-    map_parser.add_argument("--lon", type=float, required=True, help="Longitude")
-    map_parser.add_argument("--zoom", type=int, default=15, help="Zoom level (0-18, default 15)")
+    map_parser = subparsers.add_parser("map", help="Display a map at given coordinates or location")
+    map_parser.add_argument("--lat", type=float, help="Latitude")
+    map_parser.add_argument("--lon", type=float, help="Longitude")
+    map_parser.add_argument("--location", type=str, help="Location name to geocode (e.g. 'Berlin, Germany')")
+    map_parser.add_argument("--zoom", type=int, help="Zoom level (0-18, default based on location type)")
     map_parser.add_argument("--ip", help="IP address (overrides PAPER_IP env var)")
     map_parser.add_argument("--api-key", help="Stadia Maps API key (or set STADIA_API_KEY env var)")
     
@@ -194,6 +195,76 @@ def main():
             print("Get a free key at: https://client.stadiamaps.com/signup/", file=sys.stderr)
             sys.exit(1)
         
+        # Resolve coordinates - either from --lat/--lon or --location
+        lat, lon, zoom = args.lat, args.lon, args.zoom
+        location_name = None
+        
+        if args.location:
+            # Geocode the location using Nominatim (OpenStreetMap)
+            print(f"Geocoding '{args.location}'...")
+            try:
+                geocode_url = "https://nominatim.openstreetmap.org/search"
+                geocode_params = {
+                    "q": args.location,
+                    "format": "json",
+                    "limit": 1
+                }
+                geocode_headers = {
+                    "User-Agent": "PaperS3-Streamer/1.0"
+                }
+                geocode_resp = requests.get(geocode_url, params=geocode_params, headers=geocode_headers, timeout=10)
+                geocode_resp.raise_for_status()
+                results = geocode_resp.json()
+                
+                if not results:
+                    print(f"Error: Location '{args.location}' not found.", file=sys.stderr)
+                    sys.exit(1)
+                
+                result = results[0]
+                lat = float(result["lat"])
+                lon = float(result["lon"])
+                location_name = result.get("display_name", args.location)
+                
+                # Calculate appropriate zoom based on location type/bounding box
+                if zoom is None:
+                    # Use bounding box to determine zoom if available
+                    if "boundingbox" in result:
+                        bbox = result["boundingbox"]  # [south, north, west, east]
+                        lat_diff = float(bbox[1]) - float(bbox[0])
+                        lon_diff = float(bbox[3]) - float(bbox[2])
+                        max_diff = max(lat_diff, lon_diff)
+                        
+                        # Approximate zoom from bounding box size
+                        if max_diff > 10:
+                            zoom = 5
+                        elif max_diff > 5:
+                            zoom = 7
+                        elif max_diff > 1:
+                            zoom = 10
+                        elif max_diff > 0.1:
+                            zoom = 13
+                        elif max_diff > 0.01:
+                            zoom = 15
+                        else:
+                            zoom = 16
+                    else:
+                        zoom = 14  # Default for named locations
+                
+                print(f"Found: {location_name}")
+                print(f"Coordinates: {lat}, {lon} (zoom: {zoom})")
+                
+            except requests.exceptions.RequestException as e:
+                print(f"Error: Geocoding failed: {e}", file=sys.stderr)
+                sys.exit(1)
+        
+        elif lat is None or lon is None:
+            print("Error: Either --lat and --lon, or --location must be provided.", file=sys.stderr)
+            sys.exit(1)
+        
+        # Default zoom if not set
+        if zoom is None:
+            zoom = 15
+        
         # Query device for current screen dimensions (handles rotation)
         try:
             print(f"Querying device status...")
@@ -211,14 +282,14 @@ def main():
         # Use @2x for sharper rendering on e-ink (request double resolution, send full size)
         url = (
             f"https://tiles.stadiamaps.com/static/stamen_toner.png"
-            f"?center={args.lat},{args.lon}"
-            f"&zoom={args.zoom}"
+            f"?center={lat},{lon}"
+            f"&zoom={zoom}"
             f"&size={width}x{height}@2x"
-            f"&markers={args.lat},{args.lon}"
+            f"&markers={lat},{lon}"
             f"&api_key={api_key}"
         )
         
-        print(f"Fetching map at ({args.lat}, {args.lon}) zoom {args.zoom}...")
+        print(f"Fetching map at ({lat}, {lon}) zoom {zoom}...")
         
         try:
             # Fetch map image

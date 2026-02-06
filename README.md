@@ -165,22 +165,29 @@ Display a map centered on GPS coordinates using [Stadia Maps](https://stadiamaps
 
 **Using the Python client:**
 ```bash
-# Display Times Square, NYC
+# Search by location name (uses OpenStreetMap geocoding)
+python client/paper_cli.py map --location "Berlin, Germany"
+python client/paper_cli.py map --location "Eiffel Tower, Paris"
+python client/paper_cli.py map --location "Central Park, New York"
+
+# Display by coordinates - Times Square, NYC
 python client/paper_cli.py map --lat 40.758 --lon -73.9855
 
-# London with zoom level 12
+# London with custom zoom level
 python client/paper_cli.py map --lat 51.5074 --lon -0.1278 --zoom 12
 
 # Sydney Opera House, zoomed in
 python client/paper_cli.py map --lat -33.8568 --lon 151.2153 --zoom 16
 
 # Pass API key directly
-python client/paper_cli.py map --lat 48.8584 --lon 2.2945 --api-key "your-key"
+python client/paper_cli.py map --location "Tokyo" --api-key "your-key"
 ```
 
 **Features:**
+- **Location search**: Use `--location` to search by name (cities, landmarks, addresses)
+- Automatic zoom level based on location type (city, neighborhood, landmark)
 - Automatic marker at the center coordinates
-- Zoom levels 0-18 (default: 15)
+- Zoom levels 0-18 (override with `--zoom`)
 - Map adapts to device orientation (portrait/landscape)
 - @2x resolution for sharp text on e-ink
 

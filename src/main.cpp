@@ -300,7 +300,7 @@ void drawWelcome(bool sleeping) {
     M5.Display.setTextSize(2);
     M5.Display.drawString("paper_cli.py map", w/2, y);
     y += cmdLineH;
-    M5.Display.drawString("--lat 40.7 --lon -74.0", w/2, y);
+    M5.Display.drawString("--location \"Berlin, Germany\"", w/2, y);
     y += cmdLineH + sectionGap;
     
     // MQTT MODE
