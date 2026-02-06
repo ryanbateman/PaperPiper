@@ -1,140 +1,298 @@
-# M5Stack PaperS3 Remote Display
+# PaperS3 Streamer
 
-A wireless E-Ink display system for the M5Stack PaperS3.  
-It connects to your WiFi, receives Text or Images via a REST API, and displays them. Assumes a DHCP network.
+A wireless E-Ink display system for the [M5Stack PaperS3](https://shop.m5stack.com/products/m5paper-s3). Turn your PaperS3 into a remote display that can show text, images, maps, live streams, and MQTT messages.
 
 ## Features
 
-- **Wireless**: Connects via WiFi (DHCP).
-- **REST API**: Simple HTTP endpoints for Text and Images.
-- **Auto-Rotation**: Integrated IMU (accelerometer) rotates content automatically.
-- **Auto-Shutdown**: Powers off after 3 minutes of inactivity to save battery.
-- **Pagination**: Automatically splits long text into multiple pages.
-- **Gesture Control**:
-    - **Swipe Left/Right**: Next / Previous Page.
-    - **Swipe Up**: Increase Font Size (Text & Stream).
-    - **Swipe Down**: Decrease Font Size.
-- **UI & Navigation**:
-    - Tap screen to toggle Header (IP/Bat) and Footer (Nav Buttons) for distraction-free reading.
-    - Status bar shows Page Count, Battery %, and IP Address.
+- **Five Display Modes**: Text, Image, Stream, Map, and MQTT
+- **Auto-Rotation**: Integrated IMU rotates content when you rotate the device
+- **Auto-Shutdown**: Powers off after 3 minutes of inactivity to save battery
+- **Touch Gestures**: Swipe to navigate pages, change font size, or toggle UI
+- **REST API**: Simple HTTP endpoints for easy integration
 
-## Installation / Flashing
+## Installation
 
-1. Install **PlatformIO**.
-2. Open this folder.
-3. Copy `src/secrets.h.example` to `src/secrets.h` and fill in your WiFi credentials:
+### Requirements
+- [PlatformIO](https://platformio.org/) (CLI or IDE)
+- M5Stack PaperS3 connected via USB
+
+### Setup
+
+1. Clone this repository
+2. Copy the secrets template and add your WiFi credentials:
    ```bash
    cp src/secrets.h.example src/secrets.h
    # Edit src/secrets.h with your SSID and password
    ```
-4. Upload to M5Stack PaperS3:
+3. Build and upload:
    ```bash
    pio run -t upload
    ```
 
-## Usage (Client)
+The device will connect to WiFi and display its IP address on the welcome screen.
 
-A Python client is provided in `client/paper_cli.py`.
+### Python Client Setup
 
-### Send Text
 ```bash
-# Set IP (Optional, or use --ip flag)
-$env:PAPER_IP="192.168.1.XXX"
-
-# Send simple string
-python client/paper_cli.py text "Hello World"
-
-# Send File (Piping) - Forces UTF-8
-Get-Content my_book.txt -Encoding UTF8 | python client/paper_cli.py text
+pip install requests pillow
 ```
 
-### Send Image
-Supported formats: JPG, PNG, BMP (auto-converted).  
-**Requirement**: Install Pillow for auto-formatting: `pip install Pillow`
-
+Set your device IP (or use `--ip` flag with each command):
 ```bash
-# Pipe binary data
+# Linux/Mac
+export PAPER_IP="192.168.1.100"
+
+# Windows PowerShell
+$env:PAPER_IP="192.168.1.100"
+```
+
+---
+
+## Display Modes
+
+### Text Mode
+
+Display static text with automatic pagination. Supports word-wrap and multiple pages for long content.
+
+**Using the Python client:**
+```bash
+# Simple message
+python client/paper_cli.py text "Hello, World!"
+
+# Multi-line text
+python client/paper_cli.py text "Line 1\nLine 2\nLine 3"
+
+# Display a file
+cat book.txt | python client/paper_cli.py text
+
+# Windows PowerShell
+Get-Content book.txt -Encoding UTF8 | python client/paper_cli.py text
+```
+
+**Using curl:**
+```bash
+# JSON body
+curl -X POST http://192.168.1.100/api/text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello from curl!", "size": 2}'
+
+# Form data
+curl -X POST http://192.168.1.100/api/text \
+  -d "text=Hello from curl!"
+```
+
+**Gestures in Text Mode:**
+- Swipe left/right: Navigate pages
+- Swipe up/down: Increase/decrease font size
+- Tap: Toggle header/footer UI
+
+---
+
+### Image Mode
+
+Display JPEG or PNG images. Images are automatically scaled to fit the screen while maintaining aspect ratio.
+
+**Using the Python client:**
+```bash
+# Send an image file
 cat photo.jpg | python client/paper_cli.py image
+
+# The client auto-converts and optimizes for e-ink
 ```
+
+**Using curl:**
+```bash
+curl -X POST http://192.168.1.100/api/image \
+  -F "file=@photo.jpg"
+```
+
+**Tips:**
+- High-contrast images work best on e-ink
+- The device handles both landscape and portrait orientations
+- Images are centered and scaled to fit
+
+---
+
+### Stream Mode
+
+Real-time text streaming via TCP, similar to `tail -f`. New lines appear at the bottom and scroll up. Perfect for logs, monitoring, or live data.
+
+**Using the Python client:**
+```bash
+# Stream ping output
+ping google.com | python client/paper_cli.py stream
+
+# Stream a log file
+tail -f /var/log/syslog | python client/paper_cli.py stream
+
+# Stream any command output
+dmesg -w | python client/paper_cli.py stream
+```
+
+**Using netcat (nc):**
+```bash
+# Connect directly to the stream port
+echo "Hello from netcat" | nc 192.168.1.100 2323
+
+# Stream continuous data
+tail -f /var/log/syslog | nc 192.168.1.100 2323
+
+# Interactive session
+nc 192.168.1.100 2323
+# Type lines and press Enter to send
+```
+
+**Gestures in Stream Mode:**
+- Swipe up/down: Increase/decrease font size
+- Tap: Toggle header UI
+
+---
+
+### Map Mode
+
+Display a map centered on GPS coordinates using [Stadia Maps](https://stadiamaps.com/) with the Stamen Toner style (high-contrast black & white, ideal for e-ink).
+
+**Setup:**
+1. Get a free API key at https://client.stadiamaps.com/signup/
+2. Set the environment variable:
+   ```bash
+   # Linux/Mac
+   export STADIA_API_KEY="your-api-key"
+   
+   # Windows PowerShell
+   $env:STADIA_API_KEY="your-api-key"
+   ```
+
+**Using the Python client:**
+```bash
+# Display Times Square, NYC
+python client/paper_cli.py map --lat 40.758 --lon -73.9855
+
+# London with zoom level 12
+python client/paper_cli.py map --lat 51.5074 --lon -0.1278 --zoom 12
+
+# Sydney Opera House, zoomed in
+python client/paper_cli.py map --lat -33.8568 --lon 151.2153 --zoom 16
+
+# Pass API key directly
+python client/paper_cli.py map --lat 48.8584 --lon 2.2945 --api-key "your-key"
+```
+
+**Features:**
+- Automatic marker at the center coordinates
+- Zoom levels 0-18 (default: 15)
+- Map adapts to device orientation (portrait/landscape)
+- @2x resolution for sharp text on e-ink
+
+---
+
+### MQTT Mode
+
+Subscribe to an MQTT topic and display messages as they arrive. The display updates automatically when new messages are published. Great for IoT dashboards, alerts, or notifications.
+
+**Using the Python client:**
+```bash
+# Subscribe to a topic (no authentication)
+python client/paper_cli.py mqtt --broker "test.mosquitto.org" --topic "test/paper"
+
+# With authentication
+python client/paper_cli.py mqtt \
+  --broker "mqtt.example.com" \
+  --topic "home/sensors/#" \
+  --username "user" \
+  --password "pass"
+
+# Custom port
+python client/paper_cli.py mqtt \
+  --broker "192.168.1.50" \
+  --port 1884 \
+  --topic "alerts/critical"
+```
+
+**Using curl (to configure MQTT):**
+```bash
+curl -X POST http://192.168.1.100/api/mqtt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "broker": "test.mosquitto.org",
+    "topic": "test/paper",
+    "port": 1883
+  }'
+```
+
+**Testing with mosquitto_pub:**
+```bash
+# After subscribing, publish a test message
+mosquitto_pub -h test.mosquitto.org -t "test/paper" -m "Hello from MQTT!"
+```
+
+**Features:**
+- Wildcard topics supported (e.g., `sensors/#`, `home/+/temperature`)
+- Auto-reconnect on connection loss
+- Messages displayed with pagination (swipe to navigate)
+- Optional username/password authentication
+
+---
 
 ## API Reference
 
-- **GET** `/api/status`
-    - Returns JSON with mode, memory stats, WiFi RSSI, screen dimensions, rotation.
-- **GET** `/api/screenshot`
-    - Returns current display as BMP image.
-- **POST** `/api/text`
-    - Body: `{"text": "...", "size": 2, "clear": true}`
-- **POST** `/api/image`
-    - Body: Multipart file upload (`name="file"`).
-- **POST** `/api/mqtt`
-    - Body: `{"broker": "mqtt.example.com", "topic": "sensors/#", "port": 1883, "username": "", "password": ""}`
-    - Subscribes to MQTT topic and displays messages.
-- **TCP Stream** `Port 2323`
-    - Raw TCP socket for line-by-line streaming.
-- **Map Mode** (via CLI)
-    - Uses Stadia Maps Static API with Stamen Toner style.
-    - Requires `STADIA_API_KEY` environment variable or `--api-key` flag.
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/status` | GET | Device status (mode, memory, screen size, rotation) |
+| `/api/screenshot` | GET | Current display as BMP image |
+| `/api/text` | POST | Display text content |
+| `/api/image` | POST | Display image (multipart upload) |
+| `/api/mqtt` | POST | Configure MQTT subscription |
+| Port `2323` | TCP | Raw stream connection |
 
-## Stream Mode
-Connect to port `2323` via TCP to stream text line-by-line (like `tail -f`).
-Lines appear from the bottom up and wrap automatically.
-```bash
-# Example: Stream Ping
-ping google.com | python client/paper_cli.py stream
+### Status Response Example
+```json
+{
+  "mode": "TEXT",
+  "heap_free": 3104303,
+  "screen_width": 960,
+  "screen_height": 540,
+  "rotation": 1,
+  "wifi_rssi": -62
+}
 ```
 
-## Map Mode
-Display a map centered on specified coordinates using Stamen Toner style (high-contrast B&W, optimized for e-ink).
+---
 
-**Requirement**: Get a free Stadia Maps API key at https://client.stadiamaps.com/signup/
+## Gesture Controls
 
-```bash
-# Set API key (or use --api-key flag)
-$env:STADIA_API_KEY="your-api-key"
+| Gesture | Text Mode | Stream Mode | Image Mode |
+|---------|-----------|-------------|------------|
+| Swipe Left | Next page | - | - |
+| Swipe Right | Previous page | - | - |
+| Swipe Up | Larger font | Larger font | - |
+| Swipe Down | Smaller font | Smaller font | - |
+| Tap | Toggle UI | Toggle UI | Toggle UI |
 
-# Display map of Times Square, NYC
-python client/paper_cli.py map --lat 40.758 --lon -73.9855
+Footer buttons (when UI visible): `|<<` `<` `Page` `>` `>>|`
 
-# With custom zoom level (0-18, default 15)
-python client/paper_cli.py map --lat 51.5074 --lon -0.1278 --zoom 12
-```
-
-A marker is automatically placed at the center coordinates.
-
-## MQTT Mode
-Subscribe to an MQTT topic and display messages as they arrive. The display updates automatically when new messages are published.
-
-```bash
-# Subscribe to a topic (no auth)
-python client/paper_cli.py mqtt --broker "mqtt.example.com" --topic "home/sensors/temperature"
-
-# With authentication
-python client/paper_cli.py mqtt --broker "mqtt.example.com" --topic "alerts/#" --username "user" --password "pass"
-
-# Custom port
-python client/paper_cli.py mqtt --broker "192.168.1.50" --port 1884 --topic "test/topic"
-```
-
-The device will display a "waiting for messages" screen until the first message arrives. Messages are displayed like text mode with pagination support.
+---
 
 ## Testing
-To run the automated test suite, ensure you have python `pytest` and `requests` installed:
+
+Run the integration test suite:
 ```bash
 pip install pytest requests pillow
-```
-Then run with the device IP:
-```bash
-# Windows
-$env:PAPER_IP="192.168.1.XXX"
-pytest -s
 
-# Linux/Mac
-PAPER_IP=192.168.1.XXX pytest -s
+# Set device IP and run tests
+PAPER_IP=192.168.1.100 pytest -s
 ```
+
+---
 
 ## Credits
-Built with [M5Unified](https://github.com/m5stack/M5Unified), [ArduinoJson](https://arduinojson.org/), and [PubSubClient](https://pubsubclient.knolleary.net/) on [PlatformIO](https://platformio.org/).
+
+Built with:
+- [M5Unified](https://github.com/m5stack/M5Unified) - M5Stack device library
+- [ArduinoJson](https://arduinojson.org/) - JSON parsing
+- [PubSubClient](https://pubsubclient.knolleary.net/) - MQTT client
+- [PlatformIO](https://platformio.org/) - Build system
 
 ## License
+
 MIT License - see [LICENSE](LICENSE) for details.
