@@ -244,31 +244,78 @@ void drawWelcome(bool sleeping) {
     
     int w = M5.Display.width();
     int h = M5.Display.height();
+    String ip = WiFi.localIP().toString();
     
     M5.Display.setTextColor(TFT_BLACK);
     M5.Display.setTextDatum(middle_center);
     
-    // 1. Large IP Address
+    int y = 40;
+    
+    // Title - large
     M5.Display.setTextSize(3);
-    M5.Display.drawString("IP: " + WiFi.localIP().toString(), w/2, h/3);
+    M5.Display.drawString("PaperS3 Streamer", w/2, y);
+    y += 50;
     
-    // 2. Instructions
+    // IP Address - very large
+    M5.Display.setTextSize(4);
+    M5.Display.drawString(ip, w/2, y);
+    y += 70;
+    
+    // Section spacing
+    int sectionGap = 15;
+    int cmdLineH = 32; // Line height for size 2
+    
+    // TEXT MODE
+    M5.Display.setTextSize(3);
+    M5.Display.drawString("-- TEXT --", w/2, y);
+    y += 40;
     M5.Display.setTextSize(2);
-    int yStart = h/2;
-    int lineH = M5.Display.fontHeight() * 1.5;
+    M5.Display.drawString("paper_cli.py text \"Hello\"", w/2, y);
+    y += cmdLineH;
+    M5.Display.drawString("curl -d 'msg' " + ip + "/api/text", w/2, y);
+    y += cmdLineH + sectionGap;
     
-    M5.Display.drawString("To send text:", w/2, yStart);
-    M5.Display.drawString("curl -d \"hello\" " + WiFi.localIP().toString() + "/api/text", w/2, yStart + lineH);
+    // IMAGE MODE
+    M5.Display.setTextSize(3);
+    M5.Display.drawString("-- IMAGE --", w/2, y);
+    y += 40;
+    M5.Display.setTextSize(2);
+    M5.Display.drawString("paper_cli.py image < photo.jpg", w/2, y);
+    y += cmdLineH + sectionGap;
     
-    M5.Display.drawString("To send image:", w/2, yStart + lineH*2.5);
-    M5.Display.drawString("curl -F file=@img.jpg " + WiFi.localIP().toString() + "/api/image", w/2, yStart + lineH*3.5);
+    // STREAM MODE
+    M5.Display.setTextSize(3);
+    M5.Display.drawString("-- STREAM --", w/2, y);
+    y += 40;
+    M5.Display.setTextSize(2);
+    M5.Display.drawString("nc " + ip + " 2323", w/2, y);
+    y += cmdLineH;
+    M5.Display.drawString("paper_cli.py stream", w/2, y);
+    y += cmdLineH + sectionGap;
     
-    M5.Display.drawString("To stream logs:", w/2, yStart + lineH*5);
-    M5.Display.drawString("nc " + WiFi.localIP().toString() + " 2323", w/2, yStart + lineH*6);
+    // MAP MODE
+    M5.Display.setTextSize(3);
+    M5.Display.drawString("-- MAP --", w/2, y);
+    y += 40;
+    M5.Display.setTextSize(2);
+    M5.Display.drawString("paper_cli.py map", w/2, y);
+    y += cmdLineH;
+    M5.Display.drawString("--lat 40.7 --lon -74.0", w/2, y);
+    y += cmdLineH + sectionGap;
+    
+    // MQTT MODE
+    M5.Display.setTextSize(3);
+    M5.Display.drawString("-- MQTT --", w/2, y);
+    y += 40;
+    M5.Display.setTextSize(2);
+    M5.Display.drawString("paper_cli.py mqtt", w/2, y);
+    y += cmdLineH;
+    M5.Display.drawString("--broker host --topic sensors/#", w/2, y);
     
     if (sleeping) {
         M5.Display.setTextSize(3);
-        M5.Display.drawString("Sleeping...", w/2, h - 40);
+        M5.Display.setTextDatum(bottom_center);
+        M5.Display.drawString("Sleeping...", w/2, h - 20);
     }
 
     M5.Display.startWrite(); M5.Display.endWrite();
