@@ -293,6 +293,8 @@ Built with:
 - [PubSubClient](https://pubsubclient.knolleary.net/) - MQTT client
 - [PlatformIO](https://platformio.org/) - Build system
 
+This project was generated using [OpenCode](https://opencode.ai/) with [Claude Opus](https://www.anthropic.com/claude). Code reviewed by Ryan Bateman.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
