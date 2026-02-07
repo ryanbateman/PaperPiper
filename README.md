@@ -1,6 +1,6 @@
 # Paper Piper
 
-A wireless E-Ink display system for the [M5Stack PaperS3](https://shop.m5stack.com/products/m5paper-s3). Turn your PaperS3 into a remote display that can show text, images, maps, live streams, and MQTT messages.
+A wireless E-Ink display system for the [M5Stack PaperS3](https://shop.m5stack.com/products/m5papers3-esp32s3-development-kit?variant=45853201989889). Turn your PaperS3 into a remote display that can show text, images, maps, live streams, and MQTT messages.
 
 ![Paper Piper](media/header.jpg)
 
