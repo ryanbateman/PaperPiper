@@ -631,7 +631,8 @@ void drawLayout() {
             
             float scaleX = (float)scrW / imgW;
             float scaleY = (float)scrH / imgH;
-            float scale = (scaleX < scaleY) ? scaleX : scaleY; // Contain
+            // Use "cover" scaling - fill entire screen, may crop edges
+            float scale = (scaleX > scaleY) ? scaleX : scaleY;
             
             // 3. Render Scaled Sprite to Display
             // pushRotateZoom renders *centered* at the destination coordinate (scrW/2, scrH/2).

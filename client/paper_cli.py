@@ -310,12 +310,14 @@ def main():
             width, height = 960, 540
         
         # Build Stadia Static Maps URL
-        # Use @2x for sharper rendering on e-ink (request double resolution, send full size)
+        # Request a square map that works in both portrait and landscape orientations
+        # The square size should be the larger screen dimension
+        map_size = max(width, height)  # 960 for this device
         url = (
             f"https://tiles.stadiamaps.com/static/stamen_toner.png"
             f"?center={lat},{lon}"
             f"&zoom={zoom}"
-            f"&size={width}x{height}@2x"
+            f"&size={map_size}x{map_size}@2x"
             f"&markers={lat},{lon}"
             f"&api_key={api_key}"
         )
@@ -335,11 +337,15 @@ def main():
                 
                 img = Image.open(io.BytesIO(img_data))
                 
-                # Resize from @2x back to device dimensions
-                # The @2x gives us sharper source, but we need to fit device screen
-                if img.size != (width, height):
-                    print(f"Resizing map from {img.size} to {width}x{height}...")
-                    img = img.resize((width, height), Image.Resampling.LANCZOS)
+                # Resize square map to fit device memory
+                # We requested a square map at map_size x map_size @2x from Stadia
+                # So we receive a 2*map_size x 2*map_size image (e.g. 1920x1920)
+                # Resize down to map_size x map_size (e.g. 960x960) for device memory
+                target_size = max(width, height)  # 960 for this device
+                
+                if img.width > target_size or img.height > target_size:
+                    print(f"Resizing map from {img.size} to {target_size}x{target_size}...")
+                    img = img.resize((target_size, target_size), Image.Resampling.LANCZOS)
                 
                 # Convert to grayscale (Stamen Toner is already B&W but ensure clean conversion)
                 img = img.convert('L')
