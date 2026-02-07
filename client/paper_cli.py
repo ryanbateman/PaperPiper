@@ -365,10 +365,11 @@ def main():
             except ImportError:
                 print("Warning: Pillow not installed. Sending map without enhancement.", file=sys.stderr)
             
-            # Send to device
+            # Send to device with X-Content-Type header to indicate this is a map
             print(f"Sending map ({len(img_data)} bytes) to {base_url}/image...")
             files = {'file': ('map.jpg', img_data, 'application/octet-stream')}
-            resp = requests.post(f"{base_url}/image", files=files, timeout=30)
+            headers = {'X-Content-Type': 'map'}
+            resp = requests.post(f"{base_url}/image", files=files, headers=headers, timeout=30)
             resp.raise_for_status()
             print("Success! Map displayed.")
             if args.retain:

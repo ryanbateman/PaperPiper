@@ -21,6 +21,7 @@ WebServer server(PORT);
 uint8_t *imgBuffer = nullptr;
 size_t imgReceivedLen = 0;
 const size_t MAX_IMG_SIZE = 4 * 1024 * 1024; // 4MB Buffer (PLENTY for resized images)
+String imageContentType = "";  // "map" if image is a map, empty for regular images
 
 // Display State
 // Stream Buffer
@@ -184,6 +185,10 @@ void setup() {
         []() { server.send(200, "application/json", "{\"status\":\"ok\"}"); },
         handleImageUpload
     );
+    
+    // Collect custom headers for image content type detection
+    const char* headerKeys[] = {"X-Content-Type"};
+    server.collectHeaders(headerKeys, 1);
 
     server.begin();
     resetActivity();
@@ -702,7 +707,9 @@ void drawLayout() {
         }
         
         if (uiVisible) {
-            drawHeader("IMAGE");
+            // Display "MAP" if image is a map, otherwise "IMAGE"
+            const char* headerName = (imageContentType == "map") ? "MAP" : "IMAGE";
+            drawHeader(headerName);
         }
     }
 
@@ -1028,6 +1035,12 @@ void handleImageUpload() {
     if (upload.status == UPLOAD_FILE_START) {
         resetActivity();
         imgReceivedLen = 0;
+        // Check for X-Content-Type header to identify maps vs regular images
+        if (server.hasHeader("X-Content-Type")) {
+            imageContentType = server.header("X-Content-Type");
+        } else {
+            imageContentType = "";  // Regular image
+        }
     } else if (upload.status == UPLOAD_FILE_WRITE) {
         if (imgReceivedLen + upload.currentSize < MAX_IMG_SIZE) {
             memcpy(imgBuffer + imgReceivedLen, upload.buf, upload.currentSize);
