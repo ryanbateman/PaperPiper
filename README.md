@@ -2,6 +2,8 @@
 
 A wireless E-Ink display system for the [M5Stack PaperS3](https://shop.m5stack.com/products/m5paper-s3). Turn your PaperS3 into a remote display that can show text, images, maps, live streams, and MQTT messages.
 
+![Paper Piper](media/header.jpg)
+
 ## Features
 
 - **Five Display Modes**: Text, Image, Stream, Map, and MQTT
@@ -55,6 +57,8 @@ $env:PAPER_IP="192.168.1.100"
 ### Text Mode
 
 Display static text with automatic pagination. Supports word-wrap and multiple pages for long content.
+
+![Text Mode](media/text.jpg)
 
 **Using the Python client:**
 ```bash
@@ -155,6 +159,8 @@ nc 192.168.1.100 2323
 ### Map Mode
 
 Display a map centered on GPS coordinates using [Stadia Maps](https://stadiamaps.com/) with the Stamen Toner style (high-contrast black & white, ideal for e-ink).
+
+![Map Mode](media/map.jpg)
 
 **Setup:**
 1. Get a free API key at https://client.stadiamaps.com/signup/
